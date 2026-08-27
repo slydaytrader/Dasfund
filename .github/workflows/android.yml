@@ -37,7 +37,28 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Build release AAB
+      - name: Prepare release signing key (only when secrets are configured)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_B64" | base64 --decode > "$GITHUB_WORKSPACE/keystore.jks"
+
+      - name: Build signed release APK and AAB
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: >-
+          gradle --no-daemon
+          -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/keystore.jks"
+          -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD"
+          -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS"
+          -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+          :app:assembleRelease :app:bundleRelease
+
+      - name: Build unsigned release AAB (when signing secrets are not configured)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
         run: gradle --no-daemon :app:bundleRelease
 
       - name: Upload debug APK
@@ -48,10 +69,33 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload release AAB
+      - name: Upload signed release APK
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: DasFund-release-apk-signed
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload signed release AAB
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: DasFund-release-aab-signed
+          path: app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload unsigned release AAB
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: DasFund-release-aab-unsigned
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
+
+      - name: Remove temporary signing key
+        if: ${{ always() && secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: rm -f "$GITHUB_WORKSPACE/keystore.jks"
