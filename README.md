@@ -1,32 +1,33 @@
-# DasFund Android — GitHub Actions + Offline Cache
+# DasFund Android — GitHub Actions build
 
-This project wraps the existing DasFund web application and adds an offline-first cached view.
+This project is the Android client for DasFund (`https://dasify.co.ke/dasfund/`). It uses the existing DasFund web system and includes the offline cached-page experience.
 
-## Offline behaviour
+## GitHub Actions
 
-After a member successfully opens DasFund while online, the app saves the current WebView page as a local web archive. If there is no validated Internet connection later, the app opens the most recently cached page and displays:
+The workflow is at `.github/workflows/android.yml`.
 
-> Mobile data/Internet is off — showing cached information. Data not synchronized.
+Every push to `main`/`master`, pull request, or manual workflow run builds a debug APK. If all four signing secrets are configured, it also builds a signed release APK and AAB.
 
-When a validated connection returns, the app returns to the live DasFund site. Android's `NET_CAPABILITY_VALIDATED` is used to distinguish an actually validated Internet connection from a network that is merely connected. See Android's network-state documentation.
+### Signing secrets
 
-**Important:** offline mode is read-only from the user's perspective. Contributions, M-PESA requests, OTP requests, profile changes and other server operations require a live connection. The cached screen can be stale.
+Add these under **Repository Settings → Secrets and variables → Actions**:
 
-## Signing
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
 
-The GitHub workflow is set up so a release can be signed using GitHub Actions Secrets. Do not commit a keystore or passwords to the repository.
+Do not commit a keystore or passwords to the repository.
 
-For Google Play distribution, the recommended path is to upload an AAB to Play Console and use Google Play App Signing. Google then signs the APKs delivered to users. A locally signed APK by itself does not guarantee that Play Protect will never show a warning.
+## Outputs
 
-For direct distribution outside Google Play, Android's developer-verification rollout is also relevant. Registration/verification is separate from APK signing.
+The workflow uploads build artifacts named:
 
-## GitHub Actions secrets for release signing
+- `DasFund-debug-apk`
+- `DasFund-release-apk-signed` (when signing is configured)
+- `DasFund-release-aab-signed` (when signing is configured)
+- `DasFund-release-aab-unsigned` (when signing is not configured)
 
-Create these repository secrets:
+## Offline mode
 
-- `ANDROID_KEYSTORE_BASE64` — base64 of your release/upload `.jks` file
-- `ANDROID_KEYSTORE_PASSWORD` — keystore password
-- `ANDROID_KEY_ALIAS` — key alias
-- `ANDROID_KEY_PASSWORD` — key password
-
-The workflow will create `keystore.jks` only inside the runner and delete it after the build.
+After a successful online visit, the app stores a local WebView archive. If there is no validated Internet connection, it can show the cached page and an offline/synchronization banner. Server actions such as OTP, M-PESA and contributions require connectivity.
