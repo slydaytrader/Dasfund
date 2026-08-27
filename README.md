@@ -1,51 +1,32 @@
-# DasFund Android — GitHub Actions Edition
+# DasFund Android — GitHub Actions + Offline Cache
 
-This project packages the existing DasFund web application at:
+This project wraps the existing DasFund web application and adds an offline-first cached view.
 
-`https://dasify.co.ke/dasfund/`
+## Offline behaviour
 
-The Android app keeps the existing PHP/MySQL DasFund backend as the source of truth.
+After a member successfully opens DasFund while online, the app saves the current WebView page as a local web archive. If there is no validated Internet connection later, the app opens the most recently cached page and displays:
 
-## Build without Android Studio
+> Mobile data/Internet is off — showing cached information. Data not synchronized.
 
-This repository includes a GitHub Actions workflow at:
+When a validated connection returns, the app returns to the live DasFund site. Android's `NET_CAPABILITY_VALIDATED` is used to distinguish an actually validated Internet connection from a network that is merely connected. See Android's network-state documentation.
 
-`.github/workflows/android.yml`
+**Important:** offline mode is read-only from the user's perspective. Contributions, M-PESA requests, OTP requests, profile changes and other server operations require a live connection. The cached screen can be stale.
 
-Every push to `main` or `master`, pull request, or manual workflow run builds:
+## Signing
 
-- **Debug APK** — ready for testing on an Android phone.
-- **Release AAB (unsigned)** — the package format used for Google Play; it still needs signing before Play Store release.
+The GitHub workflow is set up so a release can be signed using GitHub Actions Secrets. Do not commit a keystore or passwords to the repository.
 
-GitHub Actions installs Java, Android SDK packages, and Gradle automatically. The workflow uses Gradle's current `setup-gradle` action and Gradle 8.7. See the official Gradle documentation for GitHub Actions: https://docs.gradle.org/current/userguide/github-actions.html
+For Google Play distribution, the recommended path is to upload an AAB to Play Console and use Google Play App Signing. Google then signs the APKs delivered to users. A locally signed APK by itself does not guarantee that Play Protect will never show a warning.
 
-## How to use
+For direct distribution outside Google Play, Android's developer-verification rollout is also relevant. Registration/verification is separate from APK signing.
 
-1. Create a GitHub repository, e.g. `dasfund-android`.
-2. Upload all files in this project to the repository root.
-3. Open **Actions** in GitHub.
-4. Run **Build DasFund Android** manually, or push a change to `main`/`master`.
-5. Open the completed workflow run.
-6. Under **Artifacts**, download `DasFund-debug-apk` to install on a test phone.
+## GitHub Actions secrets for release signing
 
-## Google Play release
+Create these repository secrets:
 
-The workflow intentionally does not contain a private signing key. For Play Store publishing, create a GitHub Actions secret/variable setup for a secure Android keystore and add a signed-release job. Never commit the `.jks`/`.keystore` file or passwords to the repository.
+- `ANDROID_KEYSTORE_BASE64` — base64 of your release/upload `.jks` file
+- `ANDROID_KEYSTORE_PASSWORD` — keystore password
+- `ANDROID_KEY_ALIAS` — key alias
+- `ANDROID_KEY_PASSWORD` — key password
 
-## Current app architecture
-
-- Android WebView shell
-- HTTPS-only connection to DasFund
-- Persistent web session cookies
-- Android back navigation
-- Pull-to-refresh
-- File chooser support
-- `tel:`, `sms:`, `mailto:`, `geo:` and Android intent links
-- Notification permission request on Android 13+
-
-## Next recommended phase
-
-1. Add Firebase Cloud Messaging token registration.
-2. Connect native push notifications to the existing 9 AM and 9 PM contribution-reminder system.
-3. Add a native M-PESA STK Push experience.
-4. Gradually replace the WebView dashboard with native Kotlin screens while keeping the existing backend.
+The workflow will create `keystore.jks` only inside the runner and delete it after the build.
